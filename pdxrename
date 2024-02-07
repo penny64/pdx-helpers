@@ -57,7 +57,7 @@ process_recursive_directory() {
 }
 
 show_help() {
-    echo "Usage: $0 [-h] [-d <directory>] [-r] [file]"
+    echo "Usage: pdxrename [-h] [-d <directory>] [-r] [file]"
     echo "Renames zipped pdx files to match their pdxinfo file."
     echo "Also deletes any __MACOSX folders."
     echo "You should run this on any collection you want to tag."
