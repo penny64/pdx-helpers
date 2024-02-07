@@ -1,7 +1,7 @@
 #!/bin/bash
 
 show_help() {
-  echo "Usage: $0 [OPTION]... [FILE]"
+  echo "Usage: pdxhtml [OPTION]... [FILE]"
   echo "Generate a PDX index page from PDX JSON data"
   echo ""
   echo "  -h, --help       Display this help and exit"
@@ -9,7 +9,7 @@ show_help() {
   echo "  -o, --output     Specify output HTML file. Defaults to games.html if unspecified"
   echo ""
   echo "Example:"
-  echo "  $0 --input games.json --output games.html"
+  echo "  pdxhtml --input games.json --output games.html"
 }
 
 input_file=""
