@@ -81,3 +81,7 @@ real    0m8.675s
 user    0m36.887s
 sys     0m5.786s
 ```
+
+### Notes
+
+These use GNU parallel and I can't guarantee safety in any capacity- use at your own discretion, I probably won't help you use this.
