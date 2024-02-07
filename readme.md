@@ -1,5 +1,5 @@
 # PDX Helpers
-A collection of bash scripts to assist in the management of PDX files, including pdxhtml which generates a static website after json data is generated
+A collection of bash scripts to assist in the management and archival of PDX files, including pdxhtml which generates a static (but responsive!) webpage after json data is generated
 
 ## Screenshots
 
