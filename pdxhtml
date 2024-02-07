@@ -1,0 +1,208 @@
+#!/bin/bash
+
+show_help() {
+  echo "Usage: $0 [OPTION]... [FILE]"
+  echo "Generate a PDX index page from PDX JSON data"
+  echo ""
+  echo "  -h, --help       Display this help and exit"
+  echo "  -i, --input      Specify input JSON file (mandatory)"
+  echo "  -o, --output     Specify output HTML file. Defaults to games.html if unspecified"
+  echo ""
+  echo "Example:"
+  echo "  $0 --input games.json --output games.html"
+}
+
+input_file=""
+output_file="games.html"
+
+while [[ "$#" -gt 0 ]]; do
+  case $1 in
+    -h|--help) show_help; exit 0 ;;
+    -i|--input) input_file="$2"; shift ;;
+    -o|--output) output_file="$2"; shift ;;
+    *) echo "Unknown parameter passed: $1"; show_help; exit 1 ;;
+  esac
+  shift
+done
+
+if [[ -z "$input_file" ]]; then
+  echo "Error: Input file not specified."
+  show_help
+  exit 1
+fi
+
+echo '<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Game Catalog</title>
+<style type="text/css">
+body {
+  background-color: #F5F5DC;
+  font-family: monospace;
+}
+#filterInput {
+  margin-bottom: 0px; height: 20px;
+}
+.container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+table, th, td {
+  border: 1px solid black;
+}
+th, td {
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+@media screen and (max-width: 1000px) {
+  .container {
+    flex-direction: column;
+  }
+  #filterInput {
+    margin-left: 0;
+  }
+  table {
+    border: 0;
+  }
+  table thead {
+    display: none;
+  }
+  table tr {
+    margin-bottom: 10px;
+    display: block;
+    border-bottom: 2px solid;
+  }
+  table td {
+    word-break: break-all;
+    display: block;
+    text-align: right;
+    font-size: 13px;
+    word-wrap: break-word;
+    border-bottom: 1px dotted #ccc;
+  }
+  table td:last-child {
+    border-bottom: 0;
+  }
+  table td:before {
+    content: attr(data-label);
+    float: left;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+  table td[data-label="Name"], table td[data-label="Author"], table td[data-label="Version"], table td[data-label="Build Number"], table td[data-label="File"] {
+    cursor: pointer;
+  }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1 style="margin-right: 20px; display: flex; align-items: center; height: 0px;">Game Catalog</h1>
+  <input type="text" id="filterInput" onkeyup="filterTable()" placeholder="Search for names, authors, files..." />
+</div>
+<table id="gamesTable">
+<thead>
+<tr>
+<th onclick="sortTable(0)">Name</th>
+<th onclick="sortTable(1)">Author</th>
+<th onclick="sortTable(2)">Version</th>
+<th onclick="sortTable(3)">Build Number</th>
+<th onclick="sortTable(4)">File</th>
+</tr>
+</thead>
+<tbody>' > "$output_file"
+
+jq -c '.[]' "$input_file" | parallel --pipe -N$(nproc) 'while IFS= read -r line; do name=$(echo "$line" | jq -r ".Name // empty | if . == \"\" then \"N/A\" else . end" | sed "s/^ *//g"); author=$(echo "$line" | jq -r ".Author // empty | if . == \"\" then \"N/A\" else . end" | sed "s/^ *//g"); version=$(echo "$line" | jq -r ".Version // empty | if . == \"\" then \"N/A\" else . end" | sed "s/^ *//g"); build_number=$(echo "$line" | jq -r ".\"Build Number\" // empty | if . == \"\" then \"N/A\" else . end" | sed "s/^ *//g"); file=$(echo "$line" | jq -r ".File // empty | if . == \"\" then \"N/A\" else . end" | sed "s/^ *//g;s/</\&lt;/g;s/>/\&gt;/g"); echo "<tr><td data-label=\"Name\">$name</td><td data-label=\"Author\">$author</td><td data-label=\"Version\">$version</td><td data-label=\"Build Number\">$build_number</td><td data-label=\"File\">$file</td></tr>"; done' >> "$output_file"
+
+
+echo '</tbody>
+</table>
+<script type="text/javascript">
+//<![CDATA[
+function checkSelection(event) {
+  if (!window.getSelection().toString()) {
+    var columnIndex = event.target.cellIndex;
+    sortTable(columnIndex);
+  }
+}
+document.querySelectorAll("td").forEach(td => td.addEventListener("click", checkSelection));
+//]]>
+</script>
+
+<script type="text/javascript">
+//<![CDATA[
+function filterTable() {
+  var input, filter, table, tr, td, i, txtValue;
+  input = document.getElementById("filterInput");
+  filter = input.value.toUpperCase();
+  table = document.getElementById("gamesTable");
+  tr = table.getElementsByTagName("tr");
+  for (i = 0; i < tr.length; i++) {
+    td = tr[i].getElementsByTagName("td");
+    if (td.length > 0) {
+      if (td[0].textContent.toUpperCase().indexOf(filter) > -1 || td[1].textContent.toUpperCase().indexOf(filter) > -1 || td[4].textContent.toUpperCase().indexOf(filter) > -1) {
+        tr[i].style.display = "";
+      } else {
+        tr[i].style.display = "none";
+      }
+    }       
+  }
+}
+
+function sortTable(n) {
+  var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+  table = document.getElementById("gamesTable");
+  switching = true;
+  dir = "asc";
+  while (switching) {
+    switching = false;
+    rows = table.rows;
+    for (i = 1; i < (rows.length - 1); i++) {
+      shouldSwitch = false;
+      x = rows[i].getElementsByTagName("TD")[n];
+      y = rows[i + 1].getElementsByTagName("TD")[n];
+      if (dir == "asc") {
+        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+          shouldSwitch = true;
+          break;
+        }
+      } else if (dir == "desc") {
+        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+          shouldSwitch = true;
+          break;
+        }
+      }
+    }
+    if (shouldSwitch) {
+      rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+      switching = true;
+      switchcount ++;
+    } else {
+      if (switchcount == 0 && dir == "asc") {
+        dir = "desc";
+        switching = true;
+      }
+    }
+  }
+}
+//]]>
+</script>
+<script type="text/javascript">
+//<![CDATA[
+document.addEventListener("DOMContentLoaded", function() {
+  sortTable(0);
+});
+//]]>
+</script>
+</body>
+</html>' >> "$output_file"

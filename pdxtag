@@ -1,0 +1,98 @@
+#!/bin/bash
+
+sanitize_data() {
+    echo "$1" | tr -d '\n' | tr -d '[:cntrl:]' | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\//\\\//g'
+}
+
+process_file() {
+    local file="$1"
+    local tmpdir=$(mktemp -d) || { echo "Failed to create temp directory"; exit 1; }
+    if file "$file" | grep -qE 'Zip archive data'; then
+        local pdxtagCount=$(unzip -l "$file" | grep -c "pdxinfo")
+        if [ "$pdxtagCount" -eq 1 ]; then
+            unzip -q "$file" "*/pdxinfo" -d "$tmpdir" &&
+            local pdxinfo=$(find "$tmpdir" -type f -name "pdxinfo" -print -quit)
+            if [ -s "$pdxinfo" ]; then
+                local name=$(sanitize_data "$(grep -oP '(?<=name=).*' "$pdxinfo" || echo '')")
+                local author=$(sanitize_data "$(grep -oP '(?<=author=).*' "$pdxinfo" || echo '')")
+                local version=$(grep -oP '(?<=version=)[^\n]*' "$pdxinfo" | head -n 1 || echo '')
+                local buildNumber=$(sanitize_data "$(grep -oP '(?<=buildNumber=).*' "$pdxinfo" | tr -d '\n' || echo '')")
+                json=("$(jq -n \
+                    --arg name "$name" \
+                    --arg author "$author" \
+                    --arg version "$version" \
+                    --arg buildNumber "$buildNumber" \
+                    --arg file "$file" \
+                    '{Name: $name, Author: $author, Version: $version, "Build Number": $buildNumber, File: $file}')")
+                    echo $json
+            fi
+        fi
+    fi
+    [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"
+}
+
+export -f process_file
+export -f sanitize_data
+
+process_and_extract() {
+    local dir=$(echo "$1" | sed 's/\\//g')
+    local outputFile=$(echo "$2" | sed 's/\\//g')
+    local recursive="$3"
+    local jsonArr=()
+
+    if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+        echo "Invalid directory"
+        help_function
+        return 1
+    fi
+
+    if [ -z "$outputFile" ]; then
+        echo "No output file specified"
+        help_function
+        return 1
+    fi
+
+    local findCommand="find \"$dir\" -type f -iname '*.zip' -maxdepth 1 -type f 2>/dev/null"
+    if [ "$recursive" = "true" ]; then
+        findCommand="find \"$dir\" -type f -iname '*.zip' -type f 2>/dev/null"
+    fi
+
+    local tmpdir=$(mktemp -d) || { echo "Failed to create temp directory"; exit 1; }
+    eval $findCommand | parallel --pipe -N$(( $(nproc) * 2 )) 'while IFS= read -r line; do result=$(process_file "$line"); [[ -n $result ]] &&echo "$result"; done' > $tmpdir/pdxobjs
+
+    readarray -t jsonArr < $tmpdir/pdxobjs
+
+    combinedJson="[]"
+    for jsonStr in "${jsonArr[@]}"; do
+        combinedJson=$(jq -n --argjson arr "$combinedJson" --argjson obj "$jsonStr" '$arr + [$obj]')
+    done
+
+    echo "$combinedJson" | jq 'sort_by(.Author, .Name, .Version, .Build)'  > "$outputFile"
+    [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"
+}
+
+help_function() {
+    echo "Usage: pdxtag [-r] <directory> <output_file>"
+    echo "Generate a JSON array containing pdx data"
+    echo "Example: pdxtag -r . index"
+    echo "  -r                Recursively process files in the directory"
+    echo "  <directory>       Directory to process"
+    echo "  <output_file>     JSON output file"
+    exit 1
+}
+
+recursive="false"
+if [ "$#" -eq 0 ]; then
+    help_function
+fi
+
+while getopts ":r" opt; do
+  case $opt in
+    r) recursive="true" ;;
+    \?) help_function ;;
+  esac
+done
+shift $((OPTIND -1))
+
+process_and_extract "$1" "$2" "$recursive"
+

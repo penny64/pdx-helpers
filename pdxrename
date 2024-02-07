@@ -1,0 +1,122 @@
+#!/bin/bash
+
+
+function remove_macos_folder_from_zip() {
+  if unzip -l "$1" | grep -q '__MACOSX/'; then
+    zip -d "$1" "__MACOSX/*"
+  fi
+}
+
+sanitize_data() {
+    echo "$1" | tr -d '\n' | tr -d '[:cntrl:]' | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\//\\\//g'
+}
+
+process_file() {
+    local file="$1"
+    local tmpdir=$(mktemp -d) || { echo "Failed to create temp directory"; exit 1; }
+    if file "$file" | grep -qE 'Zip archive data'; then
+        local pdxtagCount=$(unzip -l "$file" | grep -c "pdxinfo")
+        if [ "$pdxtagCount" -ge 1 ]; then
+            remove_macos_folder_from_zip "$file"
+        fi
+
+        if [ "$pdxtagCount" -eq 1 ]; then
+            unzip -q "$file" "*/pdxinfo" -d "$tmpdir" || { echo "Failed to unzip pdxinfo" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1; }
+            local pdxinfo=$(find "$tmpdir" -type f -name "pdxinfo" -print -quit)
+            if [ -s "$pdxinfo" ]; then
+                local name=$(grep -oP '(?<=name=).*' "$pdxinfo" || echo '')
+                local version=$(grep -oP '(?<=version=)[^\n]*' "$pdxinfo" | head -n 1)
+                if [ -z "$name" ]; then echo "$file: name extraction failed" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir" ; return 1; fi
+                if [ -z "$version" ]; then echo "$file: version extraction failed" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1; fi
+                local baseDir=$(dirname "$file")
+                local newName="${baseDir}/${name}_${version}.zip"
+                if [ ! -f "$newName" ]; then
+                    mv "$file" "$newName" || { echo "$file: failed to rename file" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1; }
+                fi
+            else
+                echo "$file: pdxinfo file is empty" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1;
+            fi
+        else
+            if [[ pdxtagCount -gt 1 ]]; then echo "$file: multiple pdxinfo files found, aborting" >&2; fi
+            return 1
+        fi
+    else
+        echo "$file is not a Zip archive" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1;
+    fi
+    [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"
+}
+
+process_directory() {
+    local dir="$1"
+    find "$dir" -maxdepth 1 -type f -iname '*.zip' -exec bash -c 'process_file "$0"' {} \;
+}
+
+process_recursive_directory() {
+    local dir="$1"
+    find "$dir" -type f -iname '*.zip' -exec bash -c 'process_file "$0"' {} \;
+}
+
+show_help() {
+    echo "Usage: $0 [-h] [-d <directory>] [-r] [file]"
+    echo "Renames zipped pdx files to match their pdxinfo file."
+    echo "Also deletes any __MACOSX folders."
+    echo "You should run this on any collection you want to tag."
+    echo ""
+    echo "-d directory: Process all pdx files in the specified directory."
+    echo "-r: Recursively process all pdx files in the specified directory and subdirectories. Must be used with -d."
+    echo "file: Process a specific pdx file."
+}
+
+export -f process_file
+export -f sanitize_data
+export -f process_recursive_directory
+export -f process_directory
+export -f remove_macos_folder_from_zip
+
+DIRECTORY=""
+RECURSIVE=false
+FILEMODE=false
+DIRECTORY_NEXT=false
+
+# Process all arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h)
+            show_help
+            exit 0
+            ;;
+        -d)
+            DIRECTORY="$2"
+            shift # past argument
+            ;;
+        -r)
+            RECURSIVE=true
+            ;;
+        *)
+            FILE="$1"
+            FILEMODE=true
+            ;;
+    esac
+    shift # past argument or value
+done
+
+if [ -z "$DIRECTORY" ] && [ "$RECURSIVE" = true ]; then
+    echo "-r requires -d to specify a directory." >&2
+    show_help
+    exit 1
+fi
+
+if [ -z "$DIRECTORY" ] && [ -z "$FILE" ]; then
+    show_help
+    exit 0
+fi
+
+if [ "$RECURSIVE" = true ] && [ -n "$DIRECTORY" ]; then
+    process_recursive_directory "$DIRECTORY"
+elif [ -n "$DIRECTORY" ]; then
+    process_directory "$DIRECTORY"
+elif [ "$FILEMODE" = true ]; then
+    process_file "$FILE"
+else
+    show_help
+fi
