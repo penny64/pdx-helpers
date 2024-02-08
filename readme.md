@@ -61,7 +61,7 @@ Example:
 
 ## Usage
 
-Requires bash, jq, and GNU parallel. Only tested on Linux.
+Requires a modern version of bash, jq, GNU grep and GNU parallel. Only tested on Linux.
 
 Get roms ready for processing with pdxrename- examine error output to determine if any repairs are needed
 
@@ -85,3 +85,5 @@ sys     0m5.786s
 ### Notes
 
 These use GNU parallel and I can't guarantee safety in any capacity- use at your own discretion, I probably won't help you use this.
+
+Mac/UNIX: install a newer version from brew or otherwise, must support readarray. Change "grep" in the scripts to "ggrep" for GNU Grep
