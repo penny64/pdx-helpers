@@ -86,4 +86,4 @@ sys     0m5.786s
 
 These use GNU parallel and I can't guarantee safety in any capacity- use at your own discretion, I probably won't help you use this.
 
-Mac/UNIX: install a newer version from brew or otherwise, must support readarray. Change "grep" in the scripts to "ggrep" for GNU Grep
+Mac/UNIX: install a newer version of bash from brew or otherwise, must support readarray. Change "grep" in the scripts to "ggrep" for GNU Grep
