@@ -29,7 +29,7 @@ process_file() {
                 if [ -z "$name" ]; then echo "$file: name extraction failed" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir" ; return 1; fi
                 if [ -z "$version" ]; then echo "$file: version extraction failed" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1; fi
                 local baseDir=$(dirname "$file")
-                local newName="${baseDir}/${name}_${version}.zip"
+                local newName="${baseDir}/${name}_${version}.pdx.zip"
                 if [ ! -f "$newName" ]; then
                     mv "$file" "$newName" || { echo "$file: failed to rename file" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1; }
                 fi
