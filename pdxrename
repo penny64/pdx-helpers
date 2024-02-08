@@ -7,14 +7,18 @@ function remove_macos_folder_from_zip() {
   fi
 }
 
+function windows_file_filter() {
+  echo "$1" | sed 's/[<>:"\/\\|?*]//g' | sed 's/\(CON\|PRN\|AUX\|NUL\|COM[1-9]\|LPT[1-9]\)//ig' | sed 's/[ ]\+$//g' | sed 's/\.$//g'
+}
+
 sanitize_data() {
     echo "$1" | tr -d '\n' | tr -d '[:cntrl:]' | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/\//\\\//g'
 }
 
 process_file() {
     local file="$1"
-    local tmpdir=$(mktemp -d) || { echo "Failed to create temp directory"; exit 1; }
     if file "$file" | grep -qE 'Zip archive data'; then
+        local tmpdir=$(mktemp -d) || { echo "Failed to create temp directory"; exit 1; }
         local pdxtagCount=$(unzip -l "$file" | grep -c "pdxinfo")
         if [ "$pdxtagCount" -ge 1 ]; then
             remove_macos_folder_from_zip "$file"
@@ -29,7 +33,7 @@ process_file() {
                 if [ -z "$name" ]; then echo "$file: name extraction failed" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir" ; return 1; fi
                 if [ -z "$version" ]; then echo "$file: version extraction failed" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1; fi
                 local baseDir=$(dirname "$file")
-                local newName="${baseDir}/${name}_${version}.pdx.zip"
+                local newName="${baseDir}/$(windows_file_filter "${name}_${version}.pdx.zip" | tr -cd '[:print:]' | tr ' ' '_')"
                 if [ ! -f "$newName" ]; then
                     mv "$file" "$newName" || { echo "$file: failed to rename file" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1; }
                 fi
@@ -40,20 +44,18 @@ process_file() {
             if [[ pdxtagCount -gt 1 ]]; then echo "$file: multiple pdxinfo files found, aborting" >&2; fi
             return 1
         fi
-    else
-        echo "$file is not a Zip archive" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1;
     fi
     [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"
 }
 
 process_directory() {
     local dir="$1"
-    find "$dir" -maxdepth 1 -type f -iname '*.zip' -exec bash -c 'process_file "$0"' {} \;
+    find "$dir" -maxdepth 1 -type f -exec bash -c 'process_file "$0"' {} \;
 }
 
 process_recursive_directory() {
     local dir="$1"
-    find "$dir" -type f -iname '*.zip' -exec bash -c 'process_file "$0"' {} \;
+    find "$dir" -type f -exec bash -c 'process_file "$0"' {} \;
 }
 
 show_help() {
@@ -72,6 +74,7 @@ export -f sanitize_data
 export -f process_recursive_directory
 export -f process_directory
 export -f remove_macos_folder_from_zip
+export -f windows_file_filter
 
 DIRECTORY=""
 RECURSIVE=false
