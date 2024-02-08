@@ -8,7 +8,7 @@ function remove_macos_folder_from_zip() {
 }
 
 function windows_file_filter() {
-  echo "$1" | sed 's/[<>:"\/\\|?*]//g' | sed 's/\(CON\|PRN\|AUX\|NUL\|COM[1-9]\|LPT[1-9]\)//ig' | sed 's/[ ]\+$//g' | sed 's/\.$//g'
+  echo "$1" | sed 's/[<>:"\/\\|?*]//g' | sed 's/[ ]\+$//g' | sed 's/\.$//g'
 }
 
 sanitize_data() {
