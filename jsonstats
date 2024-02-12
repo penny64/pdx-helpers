@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Function to display help
+show_help() {
+  echo "Usage: $0 <path_to_json_file>"
+  echo "Displays statistics about games from a JSON file."
+  echo ""
+  echo "Arguments:"
+  echo "  <path_to_json_file>    Path to the JSON file containing games data."
+}
+
+# Function to count total games
+count_games() {
+  jq '. | length' "$1"
+}
+
+# Function to count games by author
+count_by_author() {
+  jq -r '.[].Author | select(. != "") | . ' "$1" | sort | uniq -c | sort -bgr
+}
+
+
+count_games_per_folder() {
+
+  cat "$1" | jq -r '.[] | .File | split("/") | .[1]' | sort | uniq -c | sort -bgr
+
+}
+
+
+# Main function to display stats
+display_stats() {
+  echo "Total Games: $(count_games "$1")"
+  echo ""
+  echo "Games Count per Folder:"
+  count_games_per_folder "$1"
+  echo ""
+  echo "Games Count by Author:"
+  count_by_author "$1"
+
+}
+
+# Check for help argument or no argument
+if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]] || [[ $# -eq 0 ]]; then
+  show_help
+  exit 0
+fi
+
+# Check if the specified JSON file exists
+if [ -f "$1" ]; then
+  display_stats "$1"
+else
+  echo "$1 file not found."
+fi
