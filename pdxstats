@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Function to display help
+show_help() {
+  echo "Usage: $0 [-a] <path_to_json_file>"
+  echo "Displays statistics about games from a JSON file."
+  echo ""
+  echo "Arguments:"
+  echo "  -a                      Display games count by author."
+  echo "  <path_to_json_file>    Path to the JSON file containing games data."
+}
+
+count_games() {
+  jq 'map(.Name) | unique | length' "$1"
+}
+
+
+count_by_author() {
+  jq -r 'map(select(.Author != null) | {Author, Name}) | unique_by(.Name) | .[] | .Author | select(. != "")' "$1" | sort | uniq -c | sort -bgr
+}
+
+
+count_games_per_folder() {
+  jq -r 'map(select(.Name != null) | {Name, File}) | unique_by(.Name) | .[] | .File | split("/") | .[1]' "$1" | sort | uniq -c | sort -bgr
+}
+
+# Main function to display stats
+display_stats() {
+  echo "Unique Games: $(count_games "$2")"
+  echo ""
+  echo "Unique Games by Folder:"
+  count_games_per_folder "$2"
+  if [[ "$1" == "-a" ]]; then
+    echo ""
+    echo "Games Count by Author:"
+    count_by_author "$2"
+  fi
+}
+
+# Check for help argument or no argument
+if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+  show_help
+  exit 0
+fi
+
+# Check if the specified JSON file exists and handle -a flag
+if [[ "$1" == "-a" ]]; then
+  if [ -f "$2" ]; then
+    display_stats "-a" "$2"
+  else
+    echo "$2 file not found."
+    show_help
+  fi
+else
+  if [ -f "$1" ]; then
+    display_stats "" "$1"
+  else
+    echo "$1 file not found."
+    show_help
+  fi
+fi
