@@ -9,12 +9,10 @@ show_help() {
   echo "  <path_to_json_file>    Path to the JSON file containing games data."
 }
 
-# Function to count total games
 count_games() {
   jq '. | length' "$1"
 }
 
-# Function to count games by author
 count_by_author() {
   jq -r '.[].Author | select(. != "") | . ' "$1" | sort | uniq -c | sort -bgr
 }
