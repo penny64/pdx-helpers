@@ -3,7 +3,7 @@
 # Function to display help
 show_help() {
   echo "Usage: $0 [-a] <path_to_json_file>"
-  echo "Displays statistics about games from a JSON file."
+  echo "Displays statistics about games from a pdxtag JSON file."
   echo ""
   echo "Arguments:"
   echo "  -a                      Display games count by author."
