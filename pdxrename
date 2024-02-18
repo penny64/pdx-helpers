@@ -29,11 +29,13 @@ process_file() {
             local pdxinfo=$(find "$tmpdir" -type f -name "pdxinfo" -print -quit)
             if [ -s "$pdxinfo" ]; then
                 local name=$(grep -ioP '(?<=name=).*' "$pdxinfo" || echo '')
-                local version=$(grep -ioP '(?<=version=)[^\n]*' "$pdxinfo" | head -n 1)
+                local version=$(grep -ioP '(?<=version=)[^\n]*' "$pdxinfo" | head -n 1 || echo '')
+                local buildNumber=$(grep -ioP '(?<=buildNumber=)[^\n]*' "$pdxinfo" | head -n 1 || echo '')
                 if [ -z "$name" ]; then echo "$file: name extraction failed" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir" ; return 1; fi
                 if [ -z "$version" ]; then echo "$file: version extraction failed" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1; fi
                 local baseDir=$(dirname "$file")
-                local newName="${baseDir}/$(windows_file_filter "${name}_${version}.pdx.zip" | tr -cd '[:print:]' | tr ' ' '_')"
+                local newName="${baseDir}/$(windows_file_filter "${name}$( [[ -n "${buildNumber}" ]] && echo "\[${buildNumber}\]" )_${version}.pdx.zip" | tr -cd '[:print:]' | tr ' ' '_')"
+
                 if [ ! -f "$newName" ]; then
                     mv "$file" "$newName" || { echo "$file: failed to rename file" >&2; [[ -n "$tmpdir" && "$tmpdir" == /tmp/* ]] && rm -rf "$tmpdir"; return 1; }
                 fi
