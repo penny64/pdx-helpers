@@ -1,0 +1,66 @@
+#!/bin/bash
+
+function show_help() {
+  echo "Usage: edit_pdx <zipfile>"
+  echo "Extracts, edits, and updates pdxinfo in a zipfile"
+  echo "Options:"
+  echo "  -h    Display this help message"
+  echo "  -c    Remove hashinfo from pdx"
+}
+
+
+function edit_pdxinfo() {
+  local zipfile="$1"
+  if [ ! -f "$zipfile" ]; then
+    echo "$zipfile does not exist" >&2
+    exit 1
+  fi
+
+  local temp_dir=$(mktemp -d /tmp/pdxinfo_edit.XXXXXX)
+  local original_dir=$(pwd)
+  unzip "$zipfile" "*/pdxinfo" -d "$temp_dir" >&2
+
+  local pdxinfo_path=$(find "$temp_dir" -name pdxinfo)
+  if [ -z "$pdxinfo_path" ]; then
+    echo "pdxinfo not found in $zipfile" >&2
+    exit 1
+  fi
+
+  vim "$pdxinfo_path"
+
+  # Calculate relative path of pdxinfo inside the zip
+  local relative_pdxinfo_path=${pdxinfo_path#"$temp_dir/"}
+
+  # Update the zipfile with the edited pdxinfo
+  (cd "$temp_dir" && zip "$original_dir/$zipfile" "$relative_pdxinfo_path" >&2)
+  rm -r "$temp_dir"
+}
+
+function clean() {
+
+  echo "Clean function not implemented."
+}
+
+if [ "$#" -lt 1 ]; then
+  show_help
+  exit 1
+fi
+
+while getopts ":hc" opt; do
+  case ${opt} in
+    h )
+      show_help
+      exit 0
+      ;;
+    c )
+      clean
+      exit 0
+      ;;
+    \? )
+      echo "Invalid option: $OPTARG" 1>&2
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+edit_pdxinfo "$1"
